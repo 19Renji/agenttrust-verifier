@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: agenttrust-verifier
+    working_dir: /app
+    command: python app/main.py
+    volumes:
+      - .:/app
+    env_file:
+      - .env

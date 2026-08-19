@@ -1,0 +1,16 @@
+# Virtual environment
+venv/
+
+# Secrets
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Private RSA keys
+keys/*_private.pem
+
+# OS files
+.DS_Store
+Thumbs.db
