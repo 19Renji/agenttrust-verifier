@@ -11,14 +11,25 @@ from app.schemas import VerifyRequest
 from app.repository import save_audit
 from app.llm import execute_task
 from app.logger import logger
-
+import uuid
 app = FastAPI(
     title="AgentTrust Verifier",
     version="1.0.0"
 )
 
 # Create tables automatically
-Base.metadata.create_all(bind=engine)
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+app = FastAPI(
+    title="AgentTrust Verifier",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 
 @app.get("/")
@@ -35,10 +46,11 @@ def health():
             conn.execute(text("SELECT 1"))
 
         return {
-            "status": "healthy",
-            "database": "connected",
-            "llm": "pending"
-        }
+    "status": "healthy",
+    "database": "connected",
+    "llm": "configured",
+    "version": "1.0.0"
+}
 
     except Exception as e:
         return {
@@ -49,10 +61,11 @@ def health():
 @app.post("/verify")
 def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     instruction = request.instruction.model_dump()
-
+    request_id = str(uuid.uuid4())
     if is_revoked(db, instruction["sender"]):
         save_audit(
             db,
+            request_id,
             instruction["sender"],
             instruction["receiver"],
             instruction["task"],
@@ -70,6 +83,7 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     if not token_data:
         save_audit(
             db,
+            request_id,
             instruction["sender"],
             instruction["receiver"],
             instruction["task"],
@@ -85,6 +99,7 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     if not verify_signature(instruction, request.signature):
         save_audit(
             db,
+            request_id,
             instruction["sender"],
             instruction["receiver"],
             instruction["task"],
@@ -99,6 +114,7 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
 
     save_audit(
         db,
+        request_id,
         instruction["sender"],
         instruction["receiver"],
         instruction["task"],
@@ -107,11 +123,8 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     )
     logger.info(
     f"{instruction['sender']} verified successfully"
-)
-    logger.warning(
-    f"{instruction['sender']} failed verification"
-)
-    
+    )
+
     result = execute_task(instruction["task"])
     return {
     "status":"accepted",
@@ -135,7 +148,18 @@ from app.models import AuditLog
 def audit(db: Session = Depends(get_db)):
     logs = db.query(AuditLog).all()
 
-    return logs
+    return [
+        {
+            "id": log.id,
+            "sender": log.sender,
+            "receiver": log.receiver,
+            "task": log.task,
+            "status": log.status,
+            "reason": log.reason,
+            "timestamp": log.timestamp
+        }
+        for log in logs
+    ]
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
