@@ -12,11 +12,24 @@ from app.repository import save_audit
 from app.llm import execute_task
 from app.logger import logger
 import uuid
+from app.signature import sign_message
+from app.jwt_utils import create_token
+from app.schemas import Instruction
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(
     title="AgentTrust Verifier",
     version="1.0.0"
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",              # Local development
+        "https://agenttrust-dashboard-theta.vercel.app"  # Your Vercel URL
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Create tables automatically
 from contextlib import asynccontextmanager
 
@@ -176,3 +189,26 @@ async def global_exception_handler(
             "message":"Internal Server Error"
         }
     )
+
+@app.post("/simulate/agent-a")
+def simulate_agent_a(
+    instruction: Instruction,
+    tamper: bool = False,
+    db: Session = Depends(get_db)
+):
+    original = instruction.model_dump()
+
+    signature = sign_message(original)
+
+    payload_instruction = original.copy()
+
+    if tamper:
+        payload_instruction["task"] = "Delete customer records"
+
+    verify_request = VerifyRequest(
+        instruction=payload_instruction,
+        signature=signature,
+        token=create_token("AgentA", "AgentB")
+    )
+
+    return verify(verify_request, db)
