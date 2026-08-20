@@ -212,3 +212,14 @@ def simulate_agent_a(
     )
 
     return verify(verify_request, db)
+
+import os
+
+@app.get("/debug/env")
+def debug_env():
+    return {
+        "private_exists": bool(os.getenv("AGENTA_PRIVATE_KEY")),
+        "public_exists": bool(os.getenv("AGENTA_PUBLIC_KEY")),
+        "private_prefix": os.getenv("AGENTA_PRIVATE_KEY", "")[:30],
+        "public_prefix": os.getenv("AGENTA_PUBLIC_KEY", "")[:30],
+    }
