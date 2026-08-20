@@ -1,47 +1,71 @@
+import os
 import json
+import base64
+
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
 PRIVATE_KEY_PATH = "keys/agentA_private.pem"
 PUBLIC_KEY_PATH = "keys/agentA_public.pem"
 
-def sign_message(data: dict):
+
+def load_private_key():
+    key = os.getenv("AGENTA_PRIVATE_KEY")
+
+    if key:
+        return serialization.load_pem_private_key(
+            key.encode(),
+            password=None
+        )
+
     with open(PRIVATE_KEY_PATH, "rb") as f:
-        private_key = serialization.load_pem_private_key(
+        return serialization.load_pem_private_key(
             f.read(),
             password=None
         )
 
-    message = json.dumps(data, sort_keys=True).encode()
+
+def load_public_key():
+    key = os.getenv("AGENTA_PUBLIC_KEY")
+
+    if key:
+        return serialization.load_pem_public_key(
+            key.encode()
+        )
+
+    with open(PUBLIC_KEY_PATH, "rb") as f:
+        return serialization.load_pem_public_key(
+            f.read()
+        )
+
+
+def sign_message(message):
+    private_key = load_private_key()
+
+    data = json.dumps(message, sort_keys=True).encode()
 
     signature = private_key.sign(
-        message,
-        padding.PSS(
-            mgf=padding.MGF1(hashes.SHA256()),
-            salt_length=padding.PSS.MAX_LENGTH
-        ),
+        data,
+        padding.PKCS1v15(),
         hashes.SHA256()
     )
 
-    return signature.hex()
+    return base64.b64encode(signature).decode()
 
 
-def verify_signature(data: dict, signature_hex: str):
-    with open(PUBLIC_KEY_PATH, "rb") as f:
-        public_key = serialization.load_pem_public_key(f.read())
+def verify_signature(message, signature):
+    public_key = load_public_key()
 
-    message = json.dumps(data, sort_keys=True).encode()
+    data = json.dumps(message, sort_keys=True).encode()
 
     try:
         public_key.verify(
-            bytes.fromhex(signature_hex),
-            message,
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
+            base64.b64decode(signature),
+            data,
+            padding.PKCS1v15(),
             hashes.SHA256()
         )
+
         return True
 
     except Exception:
