@@ -5,13 +5,12 @@ client = Groq(api_key=settings.GROQ_API_KEY)
 
 def execute_task(task):
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="llama-3.1-8b-instant",
         messages=[
-            {
-                "role":"user",
-                "content":task
-            }
-        ]
+            {"role": "system", "content": "You are Agent B. Execute tasks concisely."},
+            {"role": "user", "content": task},
+        ],
+        temperature=0.3,
     )
 
     return response.choices[0].message.content
