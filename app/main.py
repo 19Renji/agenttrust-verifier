@@ -11,26 +11,10 @@ from app.schemas import VerifyRequest
 from app.repository import save_audit
 from app.llm import execute_task
 from app.logger import logger
-import uuid
 from app.signature import sign_message
 from app.jwt_utils import create_token
 from app.schemas import Instruction
 from fastapi.middleware.cors import CORSMiddleware
-app = FastAPI(
-    title="AgentTrust Verifier",
-    version="1.0.0"
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",              # Local development
-        "https://agenttrust-dashboard-theta.vercel.app"  # Your Vercel URL
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-# Create tables automatically
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -42,6 +26,17 @@ app = FastAPI(
     title="AgentTrust Verifier",
     version="1.0.0",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://agenttrust-dashboard-theta.vercel.app"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -74,11 +69,9 @@ def health():
 @app.post("/verify")
 def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     instruction = request.instruction.model_dump()
-    request_id = str(uuid.uuid4())
     if is_revoked(db, instruction["sender"]):
         save_audit(
             db,
-            request_id,
             instruction["sender"],
             instruction["receiver"],
             instruction["task"],
@@ -96,7 +89,6 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     if not token_data:
         save_audit(
             db,
-            request_id,
             instruction["sender"],
             instruction["receiver"],
             instruction["task"],
@@ -112,7 +104,6 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
     if not verify_signature(instruction, request.signature):
         save_audit(
             db,
-            request_id,
             instruction["sender"],
             instruction["receiver"],
             instruction["task"],
@@ -127,7 +118,6 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
 
     save_audit(
         db,
-        request_id,
         instruction["sender"],
         instruction["receiver"],
         instruction["task"],
