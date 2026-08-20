@@ -13,30 +13,27 @@ def load_private_key():
     key = os.getenv("AGENTA_PRIVATE_KEY")
 
     if key:
+        key = key.replace("\\n", "\n").strip()
+
         return serialization.load_pem_private_key(
             key.encode(),
             password=None
         )
 
-    with open(PRIVATE_KEY_PATH, "rb") as f:
-        return serialization.load_pem_private_key(
-            f.read(),
-            password=None
-        )
+    raise RuntimeError("AGENTA_PRIVATE_KEY environment variable not found")
 
 
 def load_public_key():
     key = os.getenv("AGENTA_PUBLIC_KEY")
 
     if key:
+        key = key.replace("\\n", "\n").strip()
+
         return serialization.load_pem_public_key(
             key.encode()
         )
 
-    with open(PUBLIC_KEY_PATH, "rb") as f:
-        return serialization.load_pem_public_key(
-            f.read()
-        )
+    raise RuntimeError("AGENTA_PUBLIC_KEY environment variable not found")
 
 
 def sign_message(message):
